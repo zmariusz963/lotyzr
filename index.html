@@ -640,6 +640,20 @@
     .cards-grid, .skeleton-grid { gap: 16px; }
     .flight-card { padding: 18px; }
 
+    /* Mniejsze znaczki na kartach ofert — na wąskim ekranie zajmowały za
+       dużo miejsca i wizualnie przytłaczały treść karty. */
+    .fc-weather {
+      top: 10px; right: 10px; padding: 3px 7px;
+      font-size: 0.64rem; gap: 3px;
+    }
+    .flight-card.best::before {
+      top: -9px; left: 12px; padding: 2px 8px; font-size: 0.6rem;
+    }
+    .tag-exotic { padding: 1px 5px; font-size: 0.56rem; margin-left: 4px; }
+    .fc-flag { font-size: 1.25rem; }
+    .fc-badge { padding: 1px 5px; font-size: 0.56rem; }
+    .preview-row-weather { padding: 2px 7px; font-size: 0.66rem; }
+
     .preview-header { padding: 14px 16px; }
     .preview-body { padding: 12px 16px 16px; }
     .preview-row { gap: 10px; padding: 11px 12px; }
