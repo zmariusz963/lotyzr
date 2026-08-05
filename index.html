@@ -70,9 +70,13 @@
   }
   .bg-blob-1 {
     width: 440px; height: 440px; top: -140px; left: -120px;
-    background: var(--accent);
+    background: rgba(255,255,255,0.5);
     animation: blobFloat1 20s ease-in-out infinite;
   }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .bg-blob-1 { background: rgba(255,255,255,0.06); }
+  }
+  :root[data-theme="dark"] .bg-blob-1 { background: rgba(255,255,255,0.06); }
   .bg-blob-2 {
     width: 380px; height: 380px; bottom: -160px; right: -100px;
     background: var(--accent2);
