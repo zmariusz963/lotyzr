@@ -160,7 +160,11 @@
     100% { left: 106%; transform: translateY(4px) rotate(8deg); opacity: 0; }
   }
   @media (max-width: 620px) {
-    .hero-sky { display: none; }
+    /* Pełne niebo (3 chmury + samolot) jest za ciężkie wizualnie na wąskim
+       ekranie — zostawiamy jedną, mniejszą chmurę i samolot. */
+    .hero-cloud-2, .hero-cloud-3 { display: none; }
+    .hero-cloud-1 { --s: 0.65; top: 16%; }
+    .hero-plane { font-size: 1.05rem; }
   }
   .hero-badge {
     display: inline-block;
@@ -650,6 +654,9 @@
       top: 10px; right: 10px; padding: 3px 7px;
       font-size: 0.64rem; gap: 3px;
     }
+    /* Rezerwujemy miejsce po prawej, żeby długie nazwy lotnisk
+       ("Warszawa-Chopina (WAW)") nie chowały się pod znaczkiem pogody. */
+    .fc-from { padding-right: 62px; }
     .flight-card.best::before {
       top: -9px; left: 12px; padding: 2px 8px; font-size: 0.6rem;
     }
