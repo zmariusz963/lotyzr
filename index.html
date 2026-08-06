@@ -720,21 +720,6 @@
             <button type="button" id="btnReturn">W dwie strony</button>
             <button type="button" id="btnInbound">Powrót do PL</button>
           </div>
-          <div id="durationWrap" hidden style="margin-top:12px">
-            <label for="durationDays" style="margin-bottom:6px">📅 Długość pobytu <span class="label-note">(±1 dzień)</span></label>
-            <select id="durationDays">
-              <option value="1">1 dzień</option>
-              <option value="2" selected>2 dni</option>
-              <option value="3">3 dni</option>
-              <option value="4">4 dni</option>
-              <option value="5">5 dni</option>
-              <option value="6">6 dni</option>
-              <option value="7">7 dni (tydzień)</option>
-              <option value="10">10 dni</option>
-              <option value="14">14 dni (2 tygodnie)</option>
-              <option value="21">21 dni (3 tygodnie)</option>
-            </select>
-          </div>
         </div>
         <div class="field field-date" id="dateFromField">
           <label id="dateFromLabel">📆 Data od</label>
@@ -889,8 +874,6 @@ const el = {
   airportsLabel: $('airportsLabel'),
   foreignWrap: $('foreignAirportWrap'),
   foreignInput: $('foreignAirport'),
-  durationWrap: $('durationWrap'),
-  durationDays: $('durationDays'),
   returnTimeField: $('returnTimeField'),
   dateFrom: $('dateFrom'),
   dateTo: $('dateTo'),
@@ -1005,7 +988,6 @@ let tripType = 'oneway';
 TRIP_BUTTONS.forEach(({ btn, type }) => btn.addEventListener('click', () => {
   tripType = type;
   TRIP_BUTTONS.forEach(t => t.btn.classList.toggle('active', t.type === type));
-  el.durationWrap.hidden = type !== 'roundtrip';
   el.returnTimeField.hidden = type !== 'roundtrip';
   el.foreignWrap.hidden = type !== 'inbound';
   // W jedną stronę potrzeba tylko daty wylotu, a "Powrót do PL" to
@@ -1376,7 +1358,7 @@ async function showDestinationPreview(code, label) {
 }
 
 /* ---------- Search ---------- */
-function buildSearchUrl(airport, foreignAirport, dateFrom, dateTo, durationDays) {
+function buildSearchUrl(airport, foreignAirport, dateFrom, dateTo) {
   const range = `&language=pl&market=pl-pl&outboundDepartureDateFrom=${dateFrom}&outboundDepartureDateTo=${dateTo}`;
   if (tripType === 'oneway') {
     return `${API_BASE}/oneWayFares?departureAirportIataCode=${airport}${range}`;
@@ -1385,15 +1367,17 @@ function buildSearchUrl(airport, foreignAirport, dateFrom, dateTo, durationDays)
     return `${API_BASE}/oneWayFares?departureAirportIataCode=${foreignAirport}`
       + `&arrivalAirportIataCode=${airport}${range}`;
   }
-  // Ryanair dopasowuje dlugosc pobytu scisle (durationFrom===durationTo daje
-  // czesto 0 wynikow, mimo ze pobyt o 1 dzien dluzszy/krotszy ma oferty) —
-  // szukamy wiec w zakresie +/-1 dzien wokol wybranej wartosci.
-  const dur = Number(durationDays);
-  const durationFrom = Math.max(1, dur - 1);
-  const durationTo = dur + 1;
-  return `${API_BASE}/roundTripFares?departureAirportIataCode=${airport}${range}`
-    + `&inboundDepartureDateFrom=${dateFrom}&inboundDepartureDateTo=${dateTo}`
-    + `&durationFrom=${durationFrom}&durationTo=${durationTo}`;
+  // "Data od" i "Data do" to dokladnie dzien wylotu i dzien powrotu (tak jak
+  // na prawdziwej stronie Ryanaira) - BEZ wymuszania konkretnej dlugosci
+  // pobytu. Wczesniej oba pola byly (blednie) traktowane jako wspolny
+  // zakres dat dla OBU lotow + dodatkowo scisle dopasowanie liczby nocy,
+  // przez co wiele realnie dostepnych ofert (np. Warszawa-Ateny-Warszawa)
+  // nigdy sie nie pokazywalo, mimo ze byly widoczne na stronie Ryanaira.
+  return `${API_BASE}/roundTripFares?departureAirportIataCode=${airport}`
+    + `&language=pl&market=pl-pl`
+    + `&outboundDepartureDateFrom=${dateFrom}&outboundDepartureDateTo=${dateFrom}`
+    + `&inboundDepartureDateFrom=${dateTo}&inboundDepartureDateTo=${dateTo}`
+    + `&durationFrom=1&durationTo=30`;
 }
 
 el.searchBtn.addEventListener('click', runSearch);
@@ -1419,7 +1403,6 @@ async function runSearch() {
   const maxPrice = parseFloat(el.maxPrice.value) || null;
   const destFilter = el.destFilter.value.trim().toLowerCase();
   const region = el.regionFilter.value;
-  const durationDays = el.durationDays.value;
   const departFrom = el.departTimeFrom.value;
   // Wylot od 18:00 lub później bez podanej górnej granicy -> doliczamy loty
   // do 8:00 dnia następnego (typowy wieczorny/nocny wylot).
@@ -1435,7 +1418,7 @@ async function runSearch() {
   for (const airport of airports) {
     el.status.textContent = `Szukam lotów dla ${airport}…`;
     try {
-      const fares = await fetchAllPages(buildSearchUrl(airport, foreignAirport, dateFrom, dateTo, durationDays));
+      const fares = await fetchAllPages(buildSearchUrl(airport, foreignAirport, dateFrom, dateTo));
       for (const f of fares) {
         const o = f.outbound;
         if (!o) continue;
