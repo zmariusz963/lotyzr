@@ -491,10 +491,19 @@
   .fc-dates { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; }
   .fc-date-row { display: flex; align-items: center; gap: 8px; }
   .fc-date-row .lbl { color: var(--muted); min-width: 52px; }
-  .fc-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .fc-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
   .fc-price { font-size: 1.3rem; font-weight: 900; color: var(--accent); }
   .fc-price small { font-size: 0.62em; font-weight: 700; color: var(--muted); }
+  .fc-actions { display: flex; align-items: center; gap: 8px; }
   .fc-cta { font-size: 0.78rem; font-weight: 800; color: var(--accent); white-space: nowrap; }
+  .fc-hotel-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 5px 10px; border-radius: 999px;
+    border: 1.5px solid var(--border); background: var(--bg); color: var(--muted);
+    font: inherit; font-size: 0.72rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+    transition: border-color .15s, color .15s;
+  }
+  .fc-hotel-btn:hover { border-color: var(--accent); color: var(--accent); }
   .fc-flightno {
     display: flex; align-items: center; gap: 5px;
     font-size: 0.7rem; color: var(--muted);
@@ -939,6 +948,15 @@ function buildRyanairLink({ origin, destination, dateOut, dateIn, isReturn }) {
   });
   if (isReturn && dateIn) params.set('dateIn', dateIn);
   return `https://www.ryanair.com/pl/pl/trip/flights/select?${params}`;
+}
+
+// Booking.com nie ma publicznego API cen — to link do ich wyszukiwarki
+// (miasto + daty), nie wyszukiwanie na żywo jak w przypadku Ryanaira.
+function buildBookingLink({ cityName, checkin, checkout }) {
+  const params = new URLSearchParams({
+    ss: cityName, checkin, checkout, group_adults: '1', no_rooms: '1', group_children: '0',
+  });
+  return `https://www.booking.com/searchresults.html?${params}`;
 }
 
 async function fetchAllPages(url) {
@@ -1465,7 +1483,10 @@ async function runSearch() {
       </div>
       <div class="fc-footer">
         <div class="fc-price">${r.price.toFixed(2)} <small>${r.currency}</small></div>
-        <div class="fc-cta">Rezerwuj →</div>
+        <div class="fc-actions">
+          <button type="button" class="fc-hotel-btn">🏨 Noclegi</button>
+          <div class="fc-cta">Rezerwuj →</div>
+        </div>
       </div>
       <div class="fc-flightno"><span class="fc-badge">FR</span> ${r.flightNo}</div>`;
     card.addEventListener('click', () => goToBooking({
@@ -1475,6 +1496,12 @@ async function runSearch() {
       dateIn: r.inDate ? r.inDate.slice(0, 10) : null,
       isReturn: tripType === 'roundtrip',
     }));
+    card.querySelector('.fc-hotel-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      const checkin = r.outDate.slice(0, 10);
+      const checkout = r.inDate ? r.inDate.slice(0, 10) : isoDate(new Date(r.outDate).getTime() + 3 * DAY_MS);
+      window.open(buildBookingLink({ cityName: r.to, checkin, checkout }), '_blank', 'noopener');
+    });
     grid.appendChild(card);
   });
 
