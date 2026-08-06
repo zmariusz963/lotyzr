@@ -374,6 +374,12 @@
     box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 45%, transparent);
   }
 
+  .flex-check {
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; font-weight: 600; font-size: 0.85rem; color: var(--text);
+  }
+  .flex-check input { width: auto; margin: 0; accent-color: var(--accent); }
+
   /* ---------- Buttons ---------- */
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 26px; }
   button.primary, button.secondary {
@@ -720,7 +726,28 @@
             <button type="button" id="btnReturn">W dwie strony</button>
             <button type="button" id="btnInbound">Powrót do PL</button>
           </div>
-          <div id="durationInfo" class="label-note" style="margin-top:10px" hidden></div>
+          <div id="flexWrap" hidden style="margin-top:10px">
+            <label class="flex-check">
+              <input type="checkbox" id="flexDates">
+              🔀 Elastyczne daty (najlepszy termin w zakresie)
+            </label>
+            <div id="durationInfo" class="label-note" style="margin-top:8px" hidden></div>
+            <div id="flexDurationWrap" hidden style="margin-top:10px">
+              <label for="flexDuration" style="margin-bottom:6px">📅 Długość pobytu</label>
+              <select id="flexDuration">
+                <option value="1">1 dzień</option>
+                <option value="2">2 dni</option>
+                <option value="3" selected>3 dni</option>
+                <option value="4">4 dni</option>
+                <option value="5">5 dni</option>
+                <option value="6">6 dni</option>
+                <option value="7">7 dni (tydzień)</option>
+                <option value="10">10 dni</option>
+                <option value="14">14 dni (2 tygodnie)</option>
+                <option value="21">21 dni (3 tygodnie)</option>
+              </select>
+            </div>
+          </div>
         </div>
         <div class="field field-date" id="dateFromField">
           <label id="dateFromLabel">📆 Data od</label>
@@ -876,7 +903,13 @@ const el = {
   foreignWrap: $('foreignAirportWrap'),
   foreignInput: $('foreignAirport'),
   returnTimeField: $('returnTimeField'),
+  flexWrap: $('flexWrap'),
+  flexDates: $('flexDates'),
+  flexDurationWrap: $('flexDurationWrap'),
+  flexDuration: $('flexDuration'),
   durationInfo: $('durationInfo'),
+  dateFromLabel: $('dateFromLabel'),
+  dateToLabel: $('dateToLabel'),
   dateFrom: $('dateFrom'),
   dateTo: $('dateTo'),
   dateFromField: $('dateFromField'),
@@ -1000,13 +1033,33 @@ TRIP_BUTTONS.forEach(({ btn, type }) => btn.addEventListener('click', () => {
     ? '🛬 Lotnisko docelowe w Polsce'
     : '🛫 Lotnisko wylotu';
   el.maxPriceHint.textContent = type === 'roundtrip' ? '(za dwie strony razem)' : '';
+  el.flexWrap.hidden = type !== 'roundtrip';
+  updateFlexUi();
   updateDurationInfo();
 }));
 
-// Tylko informacyjny licznik — pokazuje ile dni obejmuje wybrany zakres
-// Data od/Data do. Nie wplywa na wyszukiwanie (to robia dokladne daty).
+/* ---------- Elastyczne daty (zakres + długość pobytu) ---------- */
+el.flexDates.addEventListener('change', () => {
+  updateFlexUi();
+  updateDurationInfo();
+});
+el.flexDuration.addEventListener('change', updateDurationInfo);
+
+function updateFlexUi() {
+  const flex = el.flexDates.checked;
+  el.flexDurationWrap.hidden = !flex;
+  // W trybie elastycznym daty to zakres poszukiwań, nie konkretne dni lotu —
+  // etykiety musza to jasno pokazywac, zeby nie powtorzyc wczesniejszej
+  // pomylki (uzytkownik myslal, ze "Data od/do" to dokladne dni lotu).
+  el.dateFromLabel.textContent = flex ? '📆 Szukaj od' : '📆 Data od';
+  el.dateToLabel.textContent = flex ? '📆 Szukaj do' : '📆 Data do';
+}
+
+// Przy dokladnych datach: informacyjny licznik dlugosci pobytu (nie wplywa
+// na wyszukiwanie). Przy elastycznych datach dlugosc wybiera sie recznie
+// w polu wyzej, wiec licznik jest zbedny.
 function updateDurationInfo() {
-  if (tripType !== 'roundtrip' || !el.dateFrom.value || !el.dateTo.value) {
+  if (tripType !== 'roundtrip' || el.flexDates.checked || !el.dateFrom.value || !el.dateTo.value) {
     el.durationInfo.hidden = true;
     return;
   }
@@ -1383,12 +1436,21 @@ function buildSearchUrl(airport, foreignAirport, dateFrom, dateTo) {
     return `${API_BASE}/oneWayFares?departureAirportIataCode=${foreignAirport}`
       + `&arrivalAirportIataCode=${airport}${range}`;
   }
-  // "Data od" i "Data do" to dokladnie dzien wylotu i dzien powrotu (tak jak
-  // na prawdziwej stronie Ryanaira) - BEZ wymuszania konkretnej dlugosci
-  // pobytu. Wczesniej oba pola byly (blednie) traktowane jako wspolny
-  // zakres dat dla OBU lotow + dodatkowo scisle dopasowanie liczby nocy,
-  // przez co wiele realnie dostepnych ofert (np. Warszawa-Ateny-Warszawa)
-  // nigdy sie nie pokazywalo, mimo ze byly widoczne na stronie Ryanaira.
+  if (el.flexDates.checked) {
+    // Elastyczne daty: "Data od"/"Data do" to zakres poszukiwan, a dlugosc
+    // pobytu jest wybrana recznie w polu obok (+/-1 dzien tolerancji, bo
+    // Ryanair przy scislym dopasowaniu czesto zwraca 0 wynikow mimo
+    // dostepnych ofert o dzien dluzszych/krotszych).
+    const dur = Number(el.flexDuration.value);
+    const durationFrom = Math.max(1, dur - 1);
+    const durationTo = dur + 1;
+    return `${API_BASE}/roundTripFares?departureAirportIataCode=${airport}${range}`
+      + `&inboundDepartureDateFrom=${dateFrom}&inboundDepartureDateTo=${dateTo}`
+      + `&durationFrom=${durationFrom}&durationTo=${durationTo}`;
+  }
+  // Dokladne daty (domyslnie): "Data od" i "Data do" to dokladnie dzien
+  // wylotu i dzien powrotu (tak jak na prawdziwej stronie Ryanaira) - BEZ
+  // wymuszania konkretnej dlugosci pobytu.
   return `${API_BASE}/roundTripFares?departureAirportIataCode=${airport}`
     + `&language=pl&market=pl-pl`
     + `&outboundDepartureDateFrom=${dateFrom}&outboundDepartureDateTo=${dateFrom}`
