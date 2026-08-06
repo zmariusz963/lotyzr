@@ -776,7 +776,7 @@
     <div class="actions">
       <button class="primary" id="searchBtn" type="button">
         <span class="spinner"></span>
-        <span id="searchBtnLabel">🔍 Szukaj najtańszych lotów</span>
+        <span id="searchBtnLabel">🛫 Szukaj lotów</span>
       </button>
       <div class="carrier-row">
         <button class="secondary carrier-link" type="button"
@@ -1236,7 +1236,7 @@ function showSkeleton() {
 
 function goToBooking(opts) { window.location.href = buildRyanairLink(opts); }
 
-showEmpty('🧭', 'Wybierz lotnisko i kliknij „Szukaj najtańszych lotów”, żeby zobaczyć oferty.');
+showEmpty('🧭', 'Wybierz lotnisko i kliknij „Szukaj lotów”, żeby zobaczyć oferty.');
 
 /* ---------- Destination preview ---------- */
 async function showDestinationPreview(code, label) {
@@ -1256,7 +1256,7 @@ async function showDestinationPreview(code, label) {
     </div>`;
 
   $('previewDismiss').addEventListener('click', () =>
-    showEmpty('🧭', 'Wybierz lotnisko i kliknij „Szukaj najtańszych lotów”, żeby zobaczyć oferty.'));
+    showEmpty('🧭', 'Wybierz lotnisko i kliknij „Szukaj lotów”, żeby zobaczyć oferty.'));
 
   const subtitle = $('previewSubtitle');
   const body = $('previewBody');
