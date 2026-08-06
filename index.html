@@ -1193,12 +1193,33 @@ const today = isoDate(Date.now());
 // wyklucza loty "na już"), więc domyślnie ustawiamy jutro — inaczej pierwsze
 // wyszukiwanie po wejściu na stronę niemal zawsze kończy się "brak wyników".
 const tomorrow = isoDate(Date.now() + DAY_MS);
-// "Data do" nie może wypaść wcześniej niż aktualnie ustawiona "Data od".
-const dateToPicker = createDatePicker($('dateToTrigger'), el.dateTo, tomorrow, updateDurationInfo, () => el.dateFrom.value);
+
+// Liczymy na skladowych daty lokalnej — new Date('YYYY-MM-DD') parsuje jako
+// UTC i przy ujemnym offsecie potrafi cofnac wynik o dzien.
+function nextDayIso(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return isoDate(new Date(y, m - 1, d + 1));
+}
+
+// Lot w dwie strony musi miec powrot PO wylocie — przy dokladnych datach
+// Ryanair nie zwraca nic dla powrotu tego samego dnia (durationFrom=1).
+// W trybie elastycznym "Data do" to koniec zakresu, wiec moze byc rowna.
+const minReturnIso = () =>
+  (tripType === 'roundtrip' && !el.flexDates.checked)
+    ? nextDayIso(el.dateFrom.value)
+    : el.dateFrom.value;
+
+const dateToPicker = createDatePicker($('dateToTrigger'), el.dateTo, tomorrow, updateDurationInfo, minReturnIso);
 // Po wybraniu daty wylotu od razu otwieramy kalendarz daty powrotu —
 // mały odstęp czasu, żeby zdążyła się dokończyć animacja zamknięcia pierwszego panelu.
 // getMinIso = dziś: blokuje wybór dat z przeszłości (wcześniej nic tego nie ograniczało).
 createDatePicker($('dateFromTrigger'), el.dateFrom, tomorrow, () => {
+  // Podciagamy date powrotu OD RAZU po wyborze wylotu. Wczesniej dzialo sie
+  // to dopiero przy otwarciu kalendarza powrotu — jesli uzytkownik zamknal
+  // go bez wyboru, zostawala data powrotu rowna dacie wylotu i wyszukiwanie
+  // po cichu zwracalo zero wynikow.
+  const minIso = minReturnIso();
+  if (el.dateTo.value < minIso) dateToPicker.select(minIso);
   updateDurationInfo();
   setTimeout(() => dateToPicker.open(), 200);
 }, () => today);
@@ -1465,6 +1486,12 @@ async function runSearch() {
     el.status.textContent = 'Podaj długość pobytu (liczba dni, min. 1).';
     return;
   }
+  // Zabezpieczenie: przy dokladnych datach powrot tego samego dnia (lub
+  // wczesniej) zawsze dalby pustą liste — lepiej powiedziec to wprost.
+  if (tripType === 'roundtrip' && !el.flexDates.checked && el.dateTo.value <= el.dateFrom.value) {
+    el.status.textContent = 'Data powrotu musi być późniejsza niż data wylotu.';
+    return;
+  }
 
   // Pole ukryte w danym trybie nie ogranicza wyszukiwania: "W jedną stronę"
   // szuka tylko na dokładnie wybrany dzień, a "Powrót do PL" szuka
@@ -1513,6 +1540,11 @@ async function runSearch() {
     }
   }
 
+  // Ile ofert zwrocil sam Ryanair, zanim odsialy je nasze filtry — pozwala
+  // rozroznic "nie ma takich lotow" od "sa, ale ukryly je filtry".
+  const rawCount = results.length;
+  const cheapestRaw = rawCount ? Math.min(...results.map(r => r.price)) : null;
+
   if (maxPrice) results = results.filter(r => r.price <= maxPrice);
   if (destFilter) results = results.filter(r =>
     r.to.toLowerCase().includes(destFilter) || r.country.toLowerCase().includes(destFilter));
@@ -1529,7 +1561,15 @@ async function runSearch() {
   el.status.textContent = results.length ? 'Gotowe ✓' : '';
 
   if (!results.length) {
-    showEmpty('😕', 'Brak wyników dla podanych kryteriów. Spróbuj zmienić daty, godziny lub cenę maksymalną.');
+    if (rawCount) {
+      const cheapestTxt = `Najtańsza znaleziona oferta to ${cheapestRaw.toFixed(2)} PLN.`;
+      showEmpty('🔎', `Ryanair ma ${rawCount} ${rawCount === 1 ? 'ofertę' : 'ofert'} na te daty, `
+        + `ale wszystkie odrzuciły Twoje filtry (cena maks., godziny, region lub kierunek). ${cheapestTxt}`);
+    } else {
+      showEmpty('😕', tripType === 'roundtrip' && !el.flexDates.checked
+        ? 'Brak lotów w obie strony dokładnie na te dwa dni. Zaznacz „Elastyczne daty”, żeby przeszukać cały zakres.'
+        : 'Brak wyników dla podanych kryteriów. Spróbuj zmienić daty, godziny lub cenę maksymalną.');
+    }
     return;
   }
 
