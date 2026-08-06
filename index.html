@@ -720,6 +720,7 @@
             <button type="button" id="btnReturn">W dwie strony</button>
             <button type="button" id="btnInbound">Powrót do PL</button>
           </div>
+          <div id="durationInfo" class="label-note" style="margin-top:10px" hidden></div>
         </div>
         <div class="field field-date" id="dateFromField">
           <label id="dateFromLabel">📆 Data od</label>
@@ -875,6 +876,7 @@ const el = {
   foreignWrap: $('foreignAirportWrap'),
   foreignInput: $('foreignAirport'),
   returnTimeField: $('returnTimeField'),
+  durationInfo: $('durationInfo'),
   dateFrom: $('dateFrom'),
   dateTo: $('dateTo'),
   dateFromField: $('dateFromField'),
@@ -998,7 +1000,20 @@ TRIP_BUTTONS.forEach(({ btn, type }) => btn.addEventListener('click', () => {
     ? '🛬 Lotnisko docelowe w Polsce'
     : '🛫 Lotnisko wylotu';
   el.maxPriceHint.textContent = type === 'roundtrip' ? '(za dwie strony razem)' : '';
+  updateDurationInfo();
 }));
+
+// Tylko informacyjny licznik — pokazuje ile dni obejmuje wybrany zakres
+// Data od/Data do. Nie wplywa na wyszukiwanie (to robia dokladne daty).
+function updateDurationInfo() {
+  if (tripType !== 'roundtrip' || !el.dateFrom.value || !el.dateTo.value) {
+    el.durationInfo.hidden = true;
+    return;
+  }
+  const nights = Math.round((new Date(el.dateTo.value) - new Date(el.dateFrom.value)) / DAY_MS);
+  el.durationInfo.hidden = false;
+  el.durationInfo.textContent = `📅 Długość pobytu: ${nights} ${nights === 1 ? 'dzień' : 'dni'}`;
+}
 
 /* ---------- Custom date picker ---------- */
 const MONTH_NAMES = ['styczeń','luty','marzec','kwiecień','maj','czerwiec',
@@ -1137,11 +1152,12 @@ const today = isoDate(Date.now());
 // wyszukiwanie po wejściu na stronę niemal zawsze kończy się "brak wyników".
 const tomorrow = isoDate(Date.now() + DAY_MS);
 // "Data do" nie może wypaść wcześniej niż aktualnie ustawiona "Data od".
-const dateToPicker = createDatePicker($('dateToTrigger'), el.dateTo, tomorrow, null, () => el.dateFrom.value);
+const dateToPicker = createDatePicker($('dateToTrigger'), el.dateTo, tomorrow, updateDurationInfo, () => el.dateFrom.value);
 // Po wybraniu daty wylotu od razu otwieramy kalendarz daty powrotu —
 // mały odstęp czasu, żeby zdążyła się dokończyć animacja zamknięcia pierwszego panelu.
 // getMinIso = dziś: blokuje wybór dat z przeszłości (wcześniej nic tego nie ograniczało).
 createDatePicker($('dateFromTrigger'), el.dateFrom, tomorrow, () => {
+  updateDurationInfo();
   setTimeout(() => dateToPicker.open(), 200);
 }, () => today);
 
