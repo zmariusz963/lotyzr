@@ -734,18 +734,7 @@
             <div id="durationInfo" class="label-note" style="margin-top:8px" hidden></div>
             <div id="flexDurationWrap" hidden style="margin-top:10px">
               <label for="flexDuration" style="margin-bottom:6px">📅 Długość pobytu</label>
-              <select id="flexDuration">
-                <option value="1">1 dzień</option>
-                <option value="2">2 dni</option>
-                <option value="3" selected>3 dni</option>
-                <option value="4">4 dni</option>
-                <option value="5">5 dni</option>
-                <option value="6">6 dni</option>
-                <option value="7">7 dni (tydzień)</option>
-                <option value="10">10 dni</option>
-                <option value="14">14 dni (2 tygodnie)</option>
-                <option value="21">21 dni (3 tygodnie)</option>
-              </select>
+              <input type="number" id="flexDuration" min="1" max="90" step="1" inputmode="numeric" value="3" style="max-width:120px">
             </div>
           </div>
         </div>
@@ -1470,6 +1459,10 @@ async function runSearch() {
   const foreignAirport = el.foreignInput.value.trim().toUpperCase();
   if (tripType === 'inbound' && foreignAirport.length !== 3) {
     el.status.textContent = 'Podaj 3-literowy kod IATA lotniska wylotu (np. BHX).';
+    return;
+  }
+  if (tripType === 'roundtrip' && el.flexDates.checked && !(Number(el.flexDuration.value) >= 1)) {
+    el.status.textContent = 'Podaj długość pobytu (liczba dni, min. 1).';
     return;
   }
 
