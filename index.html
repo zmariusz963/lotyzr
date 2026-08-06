@@ -1292,39 +1292,63 @@ async function showDestinationPreview(code, label) {
     return;
   }
 
-  const cheapest = new Map();
-  for (const { outbound: o } of fares) {
-    if (!o?.price?.value) continue;
-    const key = o.arrivalAirport.iataCode;
-    if (!cheapest.has(key) || o.price.value < cheapest.get(key).price) {
-      cheapest.set(key, {
+  const region = el.regionFilter.value;
+  const maxPrice = parseFloat(el.maxPrice.value) || null;
+  let destinations;
+
+  if (maxPrice) {
+    // Budżet ustawiony: pokazujemy WSZYSTKIE terminy mieszczące się w cenie,
+    // nie tylko najtańszą datę na kierunek — inaczej np. 5 października
+    // znika z listy, jeśli 4 października jest choć trochę tańszy.
+    destinations = fares
+      .map(({ outbound: o }) => (o?.price?.value == null ? null : {
         name: o.arrivalAirport.name,
-        code: key,
+        code: o.arrivalAirport.iataCode,
         country: o.arrivalAirport.countryName,
         price: o.price.value,
         currency: o.price.currencyCode,
         date: o.departureDate,
         originCode: o.departureAirport.iataCode,
-      });
+      }))
+      .filter(d => d && d.price <= maxPrice && matchesRegion(region, d.country, d.code))
+      .sort((a, b) => a.price - b.price);
+  } else {
+    const cheapest = new Map();
+    for (const { outbound: o } of fares) {
+      if (!o?.price?.value) continue;
+      const key = o.arrivalAirport.iataCode;
+      if (!cheapest.has(key) || o.price.value < cheapest.get(key).price) {
+        cheapest.set(key, {
+          name: o.arrivalAirport.name,
+          code: key,
+          country: o.arrivalAirport.countryName,
+          price: o.price.value,
+          currency: o.price.currencyCode,
+          date: o.departureDate,
+          originCode: o.departureAirport.iataCode,
+        });
+      }
     }
+    destinations = [...cheapest.values()]
+      .filter(d => matchesRegion(region, d.country, d.code))
+      .sort((a, b) => a.price - b.price);
   }
 
-  const region = el.regionFilter.value;
-  const destinations = [...cheapest.values()]
-    .filter(d => matchesRegion(region, d.country, d.code))
-    .sort((a, b) => a.price - b.price);
-
   if (!destinations.length) {
-    subtitle.textContent = 'Brak połączeń';
+    subtitle.textContent = maxPrice ? `Brak ofert do ${maxPrice} PLN` : 'Brak połączeń';
     body.innerHTML = `<div class="preview-loading">${region === 'outside'
       ? 'Z tego lotniska Ryanair nie lata obecnie poza Europę.'
+      : maxPrice ? 'Spróbuj podnieść cenę maksymalną albo zmienić region.'
       : 'Brak dostępnych połączeń z tego lotniska w najbliższym czasie.'}</div>`;
     return;
   }
 
   const outsideCount = destinations.filter(d => isOutsideEurope(d.country, d.code)).length;
-  subtitle.textContent = `${destinations.length} kierunków · sortowane wg ceny`
-    + (region === 'all' && outsideCount ? ` · w tym ${outsideCount} poza Europą 🌴` : '');
+  subtitle.textContent = maxPrice
+    ? `${destinations.length} ofert do ${maxPrice} PLN · sortowane wg ceny`
+      + (region === 'all' && outsideCount ? ` · w tym ${outsideCount} poza Europą 🌴` : '')
+    : `${destinations.length} kierunków · sortowane wg ceny`
+      + (region === 'all' && outsideCount ? ` · w tym ${outsideCount} poza Europą 🌴` : '');
   const list = document.createElement('div');
   list.className = 'preview-list';
 
